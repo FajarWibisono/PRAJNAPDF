@@ -150,7 +150,7 @@ def main():
         """
         <div style='background-color: #f0f2f6; padding: 1rem; border-radius: 0.5rem;'>
         <p style='font-size: 18px; margin: 0;'>
-        <strong>Selamat datang di PRAJNA DocQA!</strong> - Asisten Pribadi Anda untuk analisis dokumen PDF.
+        <strong>Selamat datang di PRAJNAPDF!</strong> - Asisten Pribadi Anda untuk analisis dokumen PDF.
         Unggah dokumen Anda dan ajukan pertanyaan untuk mendapatkan wawasan yang mendalam. Pastikan Anda memiliki koneksi internet yang baik.
         </p>
         </div>
