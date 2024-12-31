@@ -29,6 +29,12 @@ header {visibility: hidden;}
 </style>
 """, unsafe_allow_html=True)
 
+# Masukkan kode pengecekan API key di sini
+try:
+    api_key = st.secrets["GROQ_API_KEY"]
+    st.write("API Key berhasil dibaca")
+except Exception as e:
+    st.error(f"Error membaca API key: {e}")
 
 # Setup logging dengan format yang lebih detail
 logging.basicConfig(
