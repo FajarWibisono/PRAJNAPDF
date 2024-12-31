@@ -12,7 +12,7 @@ import logging
 
 # Konfigurasi tampilan halaman
 st.set_page_config(
-    page_title="PRAJNA DOCQA",
+    page_title="PRAJNA PDF",
     page_icon="📖",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -145,7 +145,7 @@ def get_conversation_chain(vector_store):
         raise
 
 def main():
-    st.title("🧠 PRAJNA DocQA")
+    st.title("🧠 PRAJNA PDF")
     st.markdown(
         """
         <div style='background-color: #f0f2f6; padding: 1rem; border-radius: 0.5rem;'>
@@ -223,7 +223,7 @@ def main():
     st.markdown(
         """
         <div style='background-color: #f8f9fa; padding: 1rem; border-radius: 0.5rem; margin-top: 2rem;'>
-        <p style='font-size: 12px; color: #6c757d; margin: 0;'>
+        <p style='font-size: 13px; color: #6c757d; margin: 0;'>
         ⚠️ <strong>Disclaimer:</strong> AI-LLM dapat membuat kesalahan. 
         Mohon verifikasi informasi penting sebelum mengambil keputusan.
         </p>
