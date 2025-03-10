@@ -76,7 +76,7 @@ def initialize_llm():
         
         llm = ChatGroq(
             api_key=st.secrets["GROQ_API_KEY"],
-            model_name="mixtral-8x7b-32768",
+            model_name="gemma2-9b-it",
             **model_config
         )
         return llm
