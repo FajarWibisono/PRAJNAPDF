@@ -23,6 +23,7 @@ os.environ["STREAMLIT_SERVER_WATCH_CHANGES"] = "false"
 # 4. import dependencies lainnya
 import tempfile
 import logging
+import numpy as np
 from langchain_groq import ChatGroq
 from langchain_community.document_loaders import PyPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
@@ -59,8 +60,15 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 @st.cache_resource
-def load_embeddings(model_name="sentence-transformers/all-MiniLM-L6-v2"):
-    """Load embeddings model with caching - menggunakan model yang lebih ringan"""
+def load_embeddings(use_multilingual=True):
+    """Load embeddings model with caching"""
+    if use_multilingual:
+        # Model multilingual untuk akurasi yang lebih baik dengan berbagai bahasa
+        model_name = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+    else:
+        # Model yang lebih ringan untuk kecepatan
+        model_name = "sentence-transformers/all-MiniLM-L6-v2"
+
     return HuggingFaceEmbeddings(
         model_name=model_name,
         model_kwargs={'device': 'cpu'}
@@ -101,24 +109,49 @@ def process_pdf_file(file_content, file_name):
         logging.error(f"Error processing file {file_name}: {e}")
         return []
 
-def process_documents(pdf_docs, chunk_size=800, chunk_overlap=100):
-    """Memproses dokumen PDF dengan optimasi kecepatan"""
+def smart_chunk_sampling(chunks, max_chunks):
+    """Strategi sampling cerdas untuk memilih chunk yang representatif"""
+    total_chunks = len(chunks)
+
+    if total_chunks <= max_chunks:
+        return chunks
+
+    # Strategi 1: Prioritaskan bagian awal, tengah, dan akhir dokumen
+    first_third = max_chunks // 3
+    middle_third = max_chunks // 3
+    last_third = max_chunks - first_third - middle_third
+
+    # Ambil chunk dari awal dokumen
+    first_part = chunks[:first_third]
+
+    # Ambil chunk dari tengah dokumen
+    middle_start = (total_chunks // 2) - (middle_third // 2)
+    middle_part = chunks[middle_start:middle_start + middle_third]
+
+    # Ambil chunk dari akhir dokumen
+    last_part = chunks[-last_third:]
+
+    return first_part + middle_part + last_part
+
+def process_documents(pdf_docs, chunk_size=800, chunk_overlap=100, max_chunks=None, use_multilingual=True):
+    """Memproses dokumen PDF dengan strategi pembatasan chunk yang lebih cerdas"""
     try:
         progress_text = st.empty()
+        progress_bar = st.progress(0)
+
         progress_text.text("Mengekstrak teks dari PDF...")
+        progress_bar.progress(10)
 
         # Menggunakan text splitter yang lebih efisien
         text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=chunk_size,  # Chunk yang lebih besar
-            chunk_overlap=chunk_overlap,  # Overlap yang lebih kecil
+            chunk_size=chunk_size,
+            chunk_overlap=chunk_overlap,
             length_function=len,
             separators=["\n\n", "\n", ".", "!", "?", ",", " ", ""]
         )
 
         documents = []
-        # Proses file secara paralel dengan caching
         for pdf in pdf_docs:
-            # Gunakan cache untuk menghindari pemrosesan ulang
             doc_content = process_pdf_file(pdf.read(), pdf.name)
             documents.extend(doc_content)
 
@@ -126,37 +159,35 @@ def process_documents(pdf_docs, chunk_size=800, chunk_overlap=100):
             raise ValueError("Tidak ada dokumen yang berhasil diproses")
 
         progress_text.text("Membagi teks menjadi chunk...")
+        progress_bar.progress(30)
         chunks = text_splitter.split_documents(documents)
-
-        # Tampilkan progress
-        progress_bar = st.progress(0)
         total_chunks = len(chunks)
 
-        # Batasi jumlah chunk jika terlalu banyak
-        if total_chunks > 500:
-            st.warning(f"Dokumen menghasilkan {total_chunks} chunk. Membatasi hingga 500 chunk untuk kinerja yang lebih baik.")
-            chunks = chunks[:500]
-            total_chunks = 500
+        # Strategi pembatasan chunk yang lebih cerdas
+        if max_chunks and total_chunks > max_chunks:
+            st.info(f"Dokumen menghasilkan {total_chunks} chunk. Menggunakan strategi sampling cerdas untuk mempertahankan kualitas.")
+            chunks = smart_chunk_sampling(chunks, max_chunks)
+            st.info(f"Menggunakan {len(chunks)} chunk yang diambil dari seluruh dokumen.")
 
-        progress_text.text(f"Membuat embedding untuk {total_chunks} chunk...")
-        # Gunakan model embedding yang sudah di-cache
-        embeddings = load_embeddings()
+        progress_text.text(f"Membuat embedding untuk {len(chunks)} chunk...")
+        progress_bar.progress(50)
 
-        # Buat vector store dengan progress bar
+        # Gunakan model embedding sesuai pilihan
+        embeddings = load_embeddings(use_multilingual)
+
+        progress_text.text("Membangun indeks pencarian...")
         vector_store = FAISS.from_documents(chunks, embeddings)
-
-        # Update progress bar manually
-        for i in range(10):
-            progress_bar.progress((i+1)/10)
+        progress_bar.progress(90)
 
         progress_text.text("Pemrosesan selesai!")
+        progress_bar.progress(100)
         return vector_store
 
     except Exception as e:
         logging.error(f"Error in document processing: {e}")
         raise
 
-def get_conversation_chain(vector_store):
+def get_conversation_chain(vector_store, search_k=3):
     """Membuat rantai percakapan dengan konfigurasi yang dioptimalkan"""
     try:
         llm = initialize_llm()
@@ -170,7 +201,7 @@ def get_conversation_chain(vector_store):
         conversation_chain = ConversationalRetrievalChain.from_llm(
             llm=llm,
             retriever=vector_store.as_retriever(
-                search_kwargs={"k": 3}  # Mengambil 3 dokumen teratas
+                search_kwargs={"k": search_k}  # Jumlah dokumen yang diambil
             ),
             memory=memory,
             return_source_documents=True,
@@ -212,6 +243,34 @@ def main():
             ["Cepat (kualitas lebih rendah)", "Seimbang", "Kualitas Tinggi (lebih lambat)"]
         )
 
+        # Opsi lanjutan
+        advanced_options = st.expander("Opsi Lanjutan")
+        with advanced_options:
+            use_multilingual = st.checkbox(
+                "Gunakan model multilingual",
+                value=True,
+                help="Model multilingual lebih akurat untuk berbagai bahasa tetapi lebih lambat"
+            )
+
+            max_chunks = st.number_input(
+                "Jumlah Maksimum Chunk (0 = tidak dibatasi)",
+                min_value=0,
+                max_value=2000,
+                value=0,
+                help="Membatasi jumlah chunk dapat mempercepat pemrosesan tetapi berpotensi mengurangi akurasi"
+            )
+
+            if max_chunks == 0:
+                max_chunks = None
+
+            search_k = st.slider(
+                "Jumlah dokumen yang diambil per pertanyaan",
+                min_value=1,
+                max_value=10,
+                value=3,
+                help="Nilai lebih tinggi meningkatkan akurasi tetapi bisa membuat jawaban lebih panjang"
+            )
+
         if st.button("🔄 Proses Dokumen", use_container_width=True):
             if not pdf_docs:
                 st.error("Silakan unggah dokumen terlebih dahulu!")
@@ -233,10 +292,13 @@ def main():
                     st.session_state.vector_store = process_documents(
                         pdf_docs,
                         chunk_size=chunk_size,
-                        chunk_overlap=chunk_overlap
+                        chunk_overlap=chunk_overlap,
+                        max_chunks=max_chunks,
+                        use_multilingual=use_multilingual
                     )
                     st.session_state.conversation = get_conversation_chain(
-                        st.session_state.vector_store
+                        st.session_state.vector_store,
+                        search_k=search_k
                     )
                     st.success("✅ Dokumen berhasil diproses!")
                 except Exception as e:
