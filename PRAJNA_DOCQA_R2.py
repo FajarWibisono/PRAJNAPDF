@@ -366,42 +366,57 @@ def main():
                     st.error(f"❌ Terjadi kesalahan: {str(e)}")
                     logging.error(f"Error in main processing: {e}")
 
+    # BAGIAN CHAT - PASTIKAN INDENTASI BENAR
     # Inisialisasi riwayat chat
     if "messages" not in st.session_state:
         st.session_state.messages = []
 
-    # Tampilan chat
-    for message in st.session_state.messages:
-        with st.chat_message(message["role"]):
-            st.markdown(message["content"])
+    # Container untuk chat
+    chat_container = st.container()
 
-    # Input chat
-    if "conversation" not in st.session_state:
-        st.info("ℹ️ Silakan unggah dan proses dokumen PDF untuk memulai percakapan.")
-    else:
-        if prompt := st.chat_input("💭 Ketik pertanyaan Anda di sini..."):
-            st.session_state.messages.append({"role": "user", "content": prompt})
-            with st.chat_message("user"):
-                st.markdown(prompt)
+    with chat_container:
+        # Tampilkan header chat
+        st.subheader("💬 Tanya Jawab dengan Dokumen")
 
-            with st.chat_message("assistant"):
-                try:
-                    modified_prompt = (
-                        "Berikan jawaban selalu dalam bahasa Indonesia yang jelas dan terstruktur, "
-                        "kecuali jika diminta dalam bahasa Inggris. Jawaban harus mencakup: "
-                        f"{prompt}"
-                    )
+        # Tampilkan riwayat chat
+        for message in st.session_state.messages:
+            with st.chat_message(message["role"]):
+                st.markdown(message["content"])
 
-                    with st.spinner("🤔 Sedang berpikir..."):
-                        response = st.session_state.conversation.invoke({"question": modified_prompt})
-                        st.markdown(response["answer"])
-                        st.session_state.messages.append({"role": "assistant", "content": response["answer"]})
+        # Input chat
+        if "conversation" not in st.session_state:
+            st.info("ℹ️ Silakan unggah dan proses dokumen PDF untuk memulai percakapan.")
+        else:
+            # Tambahkan input chat
+            prompt = st.chat_input("💭 Ketik pertanyaan Anda di sini...")
 
-                except Exception as e:
-                    error_msg = f"❌ Maaf, terjadi kesalahan dalam memproses pertanyaan Anda: {str(e)}"
-                    st.error(error_msg)
-                    logging.error(f"Error in chat response: {e}")
-                    st.session_state.messages.append({"role": "assistant", "content": error_msg})
+            if prompt:
+                # Tambahkan pesan pengguna ke riwayat
+                st.session_state.messages.append({"role": "user", "content": prompt})
+
+                # Tampilkan pesan pengguna
+                with st.chat_message("user"):
+                    st.markdown(prompt)
+
+                # Tampilkan respons asisten
+                with st.chat_message("assistant"):
+                    try:
+                        modified_prompt = (
+                            "Berikan jawaban selalu dalam bahasa Indonesia yang jelas dan terstruktur, "
+                            "kecuali jika diminta dalam bahasa Inggris. Jawaban harus mencakup: "
+                            f"{prompt}"
+                        )
+
+                        with st.spinner("🤔 Sedang berpikir..."):
+                            response = st.session_state.conversation.invoke({"question": modified_prompt})
+                            st.markdown(response["answer"])
+                            st.session_state.messages.append({"role": "assistant", "content": response["answer"]})
+
+                    except Exception as e:
+                        error_msg = f"❌ Maaf, terjadi kesalahan dalam memproses pertanyaan Anda: {str(e)}"
+                        st.error(error_msg)
+                        logging.error(f"Error in chat response: {e}")
+                        st.session_state.messages.append({"role": "assistant", "content": error_msg})
 
     # Footer
     st.markdown(
