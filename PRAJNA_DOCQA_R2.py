@@ -83,7 +83,26 @@ def preprocess_text(text):
             filtered_lines.append(line)
 
     return '\n'.join(filtered_lines)
+    
+# Fungsi LOAD EMBEDDINGS
+@st.cache_resource
+def load_embeddings(use_multilingual=True):
+    """Load embeddings model with caching dan optimasi kecepatan"""
+    if use_multilingual:
+        # Model multilingual yang lebih ringan tapi masih akurat
+        model_name = "sentence-transformers/distiluse-base-multilingual-cased-v1"
+    else:
+        # Model yang sangat ringan
+        model_name = "sentence-transformers/all-MiniLM-L6-v2"
 
+    # Gunakan GPU jika tersedia
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+
+    return HuggingFaceEmbeddings(
+        model_name=model_name,
+        model_kwargs={'device': device}
+    )
+    
 def initialize_llm():
     """Inisialisasi model LLM dengan konfigurasi yang dioptimalkan"""
     try:
