@@ -14,7 +14,7 @@ os.environ["STREAMLIT_SERVER_WATCH_CHANGES"] = "false"
 
 # Konfigurasi halaman
 st.set_page_config(
-    page_title="PRAJNA DocQA",
+    page_title="PRAJNA Document QA",
     page_icon="🧠",
     layout="wide"
 )
